@@ -397,22 +397,15 @@ def test_empty_model_falls_through_to_the_default():
 
 
 # --------------------------------------------------------------------------
-# KNOWN DEFECTS
+# OpenAI SDK environment isolation
 #
-# Each test below asserts the guarantee the owner asked for and fails today.
-# They are xfail(strict=True) so the suite stays honest: they are reported as
-# xfailed, never as passed, and the day the defect is fixed they XPASS, which
-# strict mode turns into a failure so somebody removes the marker.
+# The openai SDK reads several variables from the process environment that
+# can displace credentials or leak identifiers the caller never asked to
+# send. Each case below used to be an xfail(strict=True) describing the
+# defect; they are now live assertions that the fix in `llm.make_client`
+# keeps holding.
 # --------------------------------------------------------------------------
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="DEFECT: OPENAI_CUSTOM_HEADERS in the environment replaces the "
-           "outgoing Authorization header, so the request leaves with a "
-           "credential the caller never passed. Fix: make_client should pass "
-           "default_headers={'Authorization': f'Bearer {key}'}, which makes "
-           "the SDK drop an env-supplied Authorization.",
-)
 def test_environment_cannot_replace_the_outgoing_authorization_header(clean_env):
     """The key on the wire must be the key the caller gave, whatever the env.
 
@@ -429,13 +422,6 @@ def test_environment_cannot_replace_the_outgoing_authorization_header(clean_env)
         assert stub.headers.get("authorization") == "Bearer or-real-key"
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="DEFECT (minor): OPENAI_ORG_ID and OPENAI_PROJECT_ID from the "
-           "environment are sent as OpenAI-Organization / OpenAI-Project "
-           "headers to openrouter.ai. Fix: pass those headers as Omit() in "
-           "default_headers, or pass organization/project explicitly.",
-)
 def test_no_openai_account_identifiers_are_sent_to_openrouter(clean_env):
     """An unrelated OpenAI account id must not leak to a third party.
 
@@ -450,14 +436,6 @@ def test_no_openai_account_identifiers_are_sent_to_openrouter(clean_env):
         assert "openai-project" not in stub.headers
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="DEFECT (minor): a key with surrounding whitespace is returned "
-           "verbatim; a trailing newline (the usual result of a copy-paste or "
-           "of $(cat keyfile)) then fails as APIConnectionError 'Connection "
-           "error.', which names neither the key nor the whitespace. Fix: "
-           "strip the resolved key, or refuse it with the usual message.",
-)
 def test_a_key_with_surrounding_whitespace_does_not_reach_the_transport():
     """Either fix is accepted: strip it, or reject it with a clear error.
 
